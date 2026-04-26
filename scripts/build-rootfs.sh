@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eE
-trap 'echo Error: in $0 on line $LINENO' ERR
+trap 'echo "Error: in $0 on line $LINENO (cmd: $BASH_COMMAND)"' ERR
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Please run as root"
@@ -34,7 +34,23 @@ if [[ -f "${ROOTFS_TAR}" ]]; then
 fi
 
 CHROOT_DIR="$(mktemp -d)"
-trap 'umount -lf "${CHROOT_DIR}/dev/pts" 2>/dev/null; umount -lf "${CHROOT_DIR}/dev" 2>/dev/null; umount -lf "${CHROOT_DIR}/proc" 2>/dev/null; umount -lf "${CHROOT_DIR}/sys" 2>/dev/null; umount -lf "${CHROOT_DIR}/tmp" 2>/dev/null; umount -lf "${CHROOT_DIR}/var/lib/apt/lists" 2>/dev/null; umount -lf "${CHROOT_DIR}/var/cache/apt" 2>/dev/null; rm -rf "${CHROOT_DIR}"' EXIT
+
+cleanup() {
+    set +e
+    trap - ERR
+    umount -lf "${CHROOT_DIR}/var/cache/apt"       2>/dev/null
+    umount -lf "${CHROOT_DIR}/var/lib/apt/lists"   2>/dev/null
+    umount -lf "${CHROOT_DIR}/tmp"                 2>/dev/null
+    umount -lf "${CHROOT_DIR}/sys/kernel/security" 2>/dev/null
+    umount -lf "${CHROOT_DIR}/sys/fs/cgroup"       2>/dev/null
+    umount -lf "${CHROOT_DIR}/sys"                 2>/dev/null
+    umount -lf "${CHROOT_DIR}/proc"                2>/dev/null
+    umount -lf "${CHROOT_DIR}/dev/pts"             2>/dev/null
+    umount -lf "${CHROOT_DIR}/dev"                 2>/dev/null
+    rm -rf "${CHROOT_DIR}" 2>/dev/null
+    return 0
+}
+trap cleanup EXIT
 
 echo "Bootstrapping Ubuntu ${RELASE_VERSION} (${SUITE}) arm64 rootfs..."
 
@@ -119,35 +135,52 @@ chroot "${CHROOT_DIR}" apt-get -y autoremove
 
 # Unmount pseudo-filesystems before tarring — sysfs/devtmpfs files are virtual
 # and change size while being read, causing tar to fail or produce corrupted entries.
-umount -lf "${CHROOT_DIR}/var/cache/apt"     2>/dev/null || true
-umount -lf "${CHROOT_DIR}/var/lib/apt/lists" 2>/dev/null || true
-umount -lf "${CHROOT_DIR}/tmp"               2>/dev/null || true
+umount -lf "${CHROOT_DIR}/var/cache/apt"       2>/dev/null || true
+umount -lf "${CHROOT_DIR}/var/lib/apt/lists"   2>/dev/null || true
+umount -lf "${CHROOT_DIR}/tmp"                 2>/dev/null || true
 umount -lf "${CHROOT_DIR}/sys/kernel/security" 2>/dev/null || true
-umount -lf "${CHROOT_DIR}/sys/fs/cgroup"     2>/dev/null || true
-umount -lf "${CHROOT_DIR}/sys"               2>/dev/null || true
-umount -lf "${CHROOT_DIR}/proc"              2>/dev/null || true
-umount -lf "${CHROOT_DIR}/dev/pts"           2>/dev/null || true
-umount -lf "${CHROOT_DIR}/dev"               2>/dev/null || true
+umount -lf "${CHROOT_DIR}/sys/fs/cgroup"       2>/dev/null || true
+umount -lf "${CHROOT_DIR}/sys"                 2>/dev/null || true
+umount -lf "${CHROOT_DIR}/proc"                2>/dev/null || true
+umount -lf "${CHROOT_DIR}/dev/pts"             2>/dev/null || true
+umount -lf "${CHROOT_DIR}/dev"                 2>/dev/null || true
 
 echo "Compressing rootfs to ${ROOTFS_TAR}..."
-# tar exits non-zero on xattr warnings even when output is valid.
-# Disable -e around the pipeline and check only xz's exit code.
+
+# Disable strict error handling for compression: tar returns 1 on non-fatal
+# warnings (xattrs, sparse files) and we don't want the ERR trap firing on
+# warnings. We explicitly verify the output instead.
 set +eE
-tar -cpf - --sort=name --xattrs \
-    --exclude=./sys/* \
-    --exclude=./proc/* \
-    --exclude=./dev/* \
-    --exclude=./tmp/* \
-    --exclude=./run/* \
-    -C "${CHROOT_DIR}" . 2>/dev/null | xz -3 -T0 > "${ROOTFS_TAR}"
+trap - ERR
+
+TMP_ROOTFS="${ROOTFS_TAR}.tmp"
+rm -f "${TMP_ROOTFS}"
+
+tar -cf - --sort=name --xattrs --one-file-system \
+    --exclude='./sys/*' \
+    --exclude='./proc/*' \
+    --exclude='./dev/*' \
+    --exclude='./tmp/*' \
+    --exclude='./run/*' \
+    -C "${CHROOT_DIR}" . 2>/dev/null \
+    | xz -3 -T0 > "${TMP_ROOTFS}"
 XZ_STATUS=${PIPESTATUS[1]}
+
+# Re-enable strict error handling
 set -eE
-trap 'echo Error: in $0 on line $LINENO' ERR
+trap 'echo "Error: in $0 on line $LINENO (cmd: $BASH_COMMAND)"' ERR
+
 if [ "${XZ_STATUS}" -ne 0 ]; then
     echo "Error: xz compression failed (status ${XZ_STATUS})"
+    rm -f "${TMP_ROOTFS}"
     exit 1
 fi
-if [ ! -s "${ROOTFS_TAR}" ]; then
+
+if [ ! -s "${TMP_ROOTFS}" ]; then
     echo "Error: rootfs tar is empty"
+    rm -f "${TMP_ROOTFS}"
     exit 1
 fi
+
+mv "${TMP_ROOTFS}" "${ROOTFS_TAR}"
+echo "Rootfs created successfully: $(ls -lh "${ROOTFS_TAR}" | awk '{print $5}')"
