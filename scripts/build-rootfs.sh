@@ -132,10 +132,13 @@ umount -lf "${CHROOT_DIR}/dev"               2>/dev/null || true
 echo "Compressing rootfs to ${ROOTFS_TAR}..."
 # Exclude virtual FS mount points — they're empty dirs in the rootfs and get
 # populated at boot by the kernel. Including them causes tar warnings.
+# tar exits non-zero on warnings; use pipefail-safe construct to only fail on xz error.
+set +o pipefail
 (cd "${CHROOT_DIR}" && tar -cpf - --sort=name --xattrs \
     --exclude=./sys/* \
     --exclude=./proc/* \
     --exclude=./dev/* \
     --exclude=./tmp/* \
     --exclude=./run/* \
-    ./*) | xz -3 -T0 > "${ROOTFS_TAR}"
+    ./* 2>/dev/null; exit 0) | xz -3 -T0 > "${ROOTFS_TAR}"
+set -o pipefail
