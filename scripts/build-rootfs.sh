@@ -130,15 +130,24 @@ umount -lf "${CHROOT_DIR}/dev/pts"           2>/dev/null || true
 umount -lf "${CHROOT_DIR}/dev"               2>/dev/null || true
 
 echo "Compressing rootfs to ${ROOTFS_TAR}..."
-# Exclude virtual FS mount points — they're empty dirs in the rootfs and get
-# populated at boot by the kernel. Including them causes tar warnings.
-# tar exits non-zero on warnings; use pipefail-safe construct to only fail on xz error.
-set +o pipefail
-(cd "${CHROOT_DIR}" && tar -cpf - --sort=name --xattrs \
+# tar exits non-zero on xattr warnings even when output is valid.
+# Disable -e around the pipeline and check only xz's exit code.
+set +eE
+tar -cpf - --sort=name --xattrs \
     --exclude=./sys/* \
     --exclude=./proc/* \
     --exclude=./dev/* \
     --exclude=./tmp/* \
     --exclude=./run/* \
-    ./* 2>/dev/null; exit 0) | xz -3 -T0 > "${ROOTFS_TAR}"
-set -o pipefail
+    -C "${CHROOT_DIR}" . 2>/dev/null | xz -3 -T0 > "${ROOTFS_TAR}"
+XZ_STATUS=${PIPESTATUS[1]}
+set -eE
+trap 'echo Error: in $0 on line $LINENO' ERR
+if [ "${XZ_STATUS}" -ne 0 ]; then
+    echo "Error: xz compression failed (status ${XZ_STATUS})"
+    exit 1
+fi
+if [ ! -s "${ROOTFS_TAR}" ]; then
+    echo "Error: rootfs tar is empty"
+    exit 1
+fi
