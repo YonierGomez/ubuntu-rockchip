@@ -34,6 +34,10 @@ if [[ -f "${ROOTFS_TAR}" ]]; then
 fi
 
 CHROOT_DIR="$(mktemp -d)"
+# mktemp creates directories with 700 — but / of a rootfs must be 755 or dbus
+# (running as messagebus user) can't CHDIR into it, causing status=200/CHDIR
+# and cascading failures in polkit, resolved, networkd sockets, etc.
+chmod 755 "${CHROOT_DIR}"
 
 cleanup() {
     set +e
