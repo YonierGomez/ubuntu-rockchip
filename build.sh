@@ -174,7 +174,13 @@ if [ "${KERNEL_ONLY}" == "Y" ]; then
         usage
         exit 1
     fi
-    ./scripts/build-kernel.sh
+    # Check if using mainline kernel (7.0+)
+    if [[ "${KERNEL_BRANCH}" == v7* ]] || [[ "${KERNEL_REPO}" == *"torvalds/linux"* ]]; then
+        echo "Using mainline kernel build script..."
+        ./scripts/build-kernel-mainline.sh
+    else
+        ./scripts/build-kernel.sh
+    fi
     exit 0
 fi
 
@@ -205,7 +211,13 @@ fi
 # Build the Linux kernel if not found
 if [[ ${LAUNCHPAD} != "Y" ]]; then
     if [[ ! -e "$(find build/linux-image-*.deb | sort | tail -n1)" || ! -e "$(find build/linux-headers-*.deb | sort | tail -n1)" ]]; then
-        ./scripts/build-kernel.sh
+        # Check if using mainline kernel (7.0+)
+        if [[ "${KERNEL_BRANCH}" == v7* ]] || [[ "${KERNEL_REPO}" == *"torvalds/linux"* ]]; then
+            echo "Using mainline kernel build script..."
+            ./scripts/build-kernel-mainline.sh
+        else
+            ./scripts/build-kernel.sh
+        fi
     fi
 fi
 

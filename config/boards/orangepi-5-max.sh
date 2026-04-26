@@ -6,7 +6,7 @@ export BOARD_SOC="Rockchip RK3588"
 export BOARD_CPU="ARM Cortex A76 / A55"
 export UBOOT_PACKAGE="u-boot-radxa-rk3588"
 export UBOOT_RULES_TARGET="orangepi-5-max-rk3588"
-export COMPATIBLE_SUITES=("jammy" "noble")
+export COMPATIBLE_SUITES=("jammy" "noble" "resolute")
 export COMPATIBLE_FLAVORS=("server" "desktop")
 
 function config_image_hook__orangepi-5-max() {
@@ -14,7 +14,7 @@ function config_image_hook__orangepi-5-max() {
     local overlay="$2"
     local suite="$3"
 
-    if [ "${suite}" == "jammy" ] || [ "${suite}" == "noble" ]; then
+    if [ "${suite}" == "jammy" ] || [ "${suite}" == "noble" ] || [ "${suite}" == "resolute" ]; then
         # Kernel modules to blacklist
         echo "blacklist bcmdhd" > "${rootfs}/etc/modprobe.d/bcmdhd.conf"
         echo "blacklist dhd_static_buf" >> "${rootfs}/etc/modprobe.d/bcmdhd.conf"
