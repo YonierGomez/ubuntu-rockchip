@@ -100,7 +100,10 @@ chroot "${CHROOT_DIR}" apt-get -y install \
     net-tools \
     iproute2 \
     curl \
-    wget
+    wget \
+    mtd-utils \
+    u-boot-tools \
+    device-tree-compiler
 
 if [ "${FLAVOR}" == "server" ]; then
     chroot "${CHROOT_DIR}" apt-get -y install ubuntu-server

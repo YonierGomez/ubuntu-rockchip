@@ -134,7 +134,8 @@ if [[ ${LAUNCHPAD} == "Y" ]]; then
     chroot ${chroot_dir} apt-get -y install "u-boot-${BOARD}"
 else
     cp "${uboot_package}" ${chroot_dir}/tmp/
-    chroot ${chroot_dir} dpkg -i "/tmp/${uboot_package}"
+    # dpkg -i may fail if dependencies aren't satisfied; resolve with apt-get -f
+    chroot ${chroot_dir} dpkg -i "/tmp/${uboot_package}" || chroot ${chroot_dir} apt-get install -y -f
     chroot ${chroot_dir} apt-mark hold "$(echo "${uboot_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
 
     # Build list of kernel debs that actually exist (mainline only has image+headers)
@@ -145,7 +146,8 @@ else
 
     cp "${kernel_debs[@]}" ${chroot_dir}/tmp/
     chroot ${chroot_dir} /bin/bash -c "apt-get -y purge \$(dpkg --list | grep -Ei 'linux-image|linux-headers|linux-modules|linux-rockchip' | awk '{ print \$2 }') || true"
-    chroot ${chroot_dir} /bin/bash -c "dpkg -i $(printf '/tmp/%s ' "${kernel_debs[@]}")"
+    chroot ${chroot_dir} /bin/bash -c "dpkg -i $(printf '/tmp/%s ' "${kernel_debs[@]}")" \
+        || chroot ${chroot_dir} apt-get install -y -f
     chroot ${chroot_dir} apt-mark hold "$(echo "${linux_image_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
 fi
 
