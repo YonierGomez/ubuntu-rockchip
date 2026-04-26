@@ -104,7 +104,8 @@ chroot "${CHROOT_DIR}" apt-get -y install \
     mtd-utils \
     u-boot-tools \
     u-boot-menu \
-    device-tree-compiler
+    device-tree-compiler \
+    linux-firmware
 
 if [ "${FLAVOR}" == "server" ]; then
     chroot "${CHROOT_DIR}" apt-get -y install ubuntu-server
