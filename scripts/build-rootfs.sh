@@ -133,6 +133,28 @@ mkdir -p "${CHROOT_DIR}/etc/systemd/system/getty.target.wants"
 chroot "${CHROOT_DIR}" systemctl enable serial-getty@ttyS2.service 2>/dev/null || true
 chroot "${CHROOT_DIR}" systemctl enable serial-getty@ttyFIQ0.service 2>/dev/null || true
 
+# Configure network with netplan + systemd-networkd. Without this the image
+# boots but has no network — netplan.io is installed by ubuntu-server but
+# /etc/netplan/ is empty by default.
+cat > "${CHROOT_DIR}/etc/netplan/01-netcfg.yaml" <<EOF
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    all-eth:
+      match:
+        name: "e*"
+      dhcp4: true
+      dhcp6: true
+      optional: true
+EOF
+chmod 600 "${CHROOT_DIR}/etc/netplan/01-netcfg.yaml"
+
+chroot "${CHROOT_DIR}" systemctl enable systemd-networkd.service 2>/dev/null || true
+chroot "${CHROOT_DIR}" systemctl enable systemd-networkd.socket 2>/dev/null || true
+chroot "${CHROOT_DIR}" systemctl enable systemd-networkd-wait-online.service 2>/dev/null || true
+chroot "${CHROOT_DIR}" systemctl enable systemd-resolved.service 2>/dev/null || true
+
 # Clean up apt caches
 chroot "${CHROOT_DIR}" apt-get -y clean
 chroot "${CHROOT_DIR}" apt-get -y autoremove
