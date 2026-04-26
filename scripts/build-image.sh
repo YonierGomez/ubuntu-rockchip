@@ -21,6 +21,31 @@ cleanup_loopdev() {
     fi
 }
 
+# Create partition device nodes manually by reading sysfs.
+# Needed inside Docker where udev isn't running to create /dev/loopNpN nodes.
+create_partition_nodes() {
+    local loop="$1"
+    local loop_name
+    loop_name=$(basename "${loop}")
+
+    local partition_char=""
+    [[ ${loop: -1} == [0-9] ]] && partition_char="p"
+
+    for part_sysfs in /sys/block/"${loop_name}"/"${loop_name}"${partition_char}*; do
+        [ -d "${part_sysfs}" ] || continue
+        local part_name
+        part_name=$(basename "${part_sysfs}")
+        local dev_node="/dev/${part_name}"
+        if [ ! -b "${dev_node}" ] && [ -f "${part_sysfs}/dev" ]; then
+            local major_minor
+            major_minor=$(cat "${part_sysfs}/dev")
+            local major="${major_minor%:*}"
+            local minor="${major_minor#*:}"
+            mknod "${dev_node}" b "${major}" "${minor}" 2>/dev/null || true
+        fi
+    done
+}
+
 wait_loopdev() {
     local loop="$1"
     local seconds="$2"
@@ -97,6 +122,7 @@ if [ -z "${img##*server*}" ]; then
     partprobe "${disk}"
     # Force partition node creation — udev may not be running in the container
     partx -u "${disk}" 2>/dev/null || partx -a "${disk}" 2>/dev/null || true
+    create_partition_nodes "${disk}"
 
     partition_char="$(if [[ ${disk: -1} == [0-9] ]]; then echo p; fi)"
 
@@ -152,6 +178,7 @@ else
     partprobe "${disk}"
     # Force partition node creation — udev may not be running in the container
     partx -u "${disk}" 2>/dev/null || partx -a "${disk}" 2>/dev/null || true
+    create_partition_nodes "${disk}"
 
     partition_char="$(if [[ ${disk: -1} == [0-9] ]]; then echo p; fi)"
 
