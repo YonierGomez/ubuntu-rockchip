@@ -14,12 +14,12 @@ function config_image_hook__orangepi-5-max() {
     local overlay="$2"
     local suite="$3"
 
-    if [ "${suite}" == "jammy" ] || [ "${suite}" == "noble" ] || [ "${suite}" == "resolute" ]; then
+    if [ "${suite}" == "jammy" ] || [ "${suite}" == "noble" ]; then
         # Kernel modules to blacklist
         echo "blacklist bcmdhd" > "${rootfs}/etc/modprobe.d/bcmdhd.conf"
         echo "blacklist dhd_static_buf" >> "${rootfs}/etc/modprobe.d/bcmdhd.conf"
 
-        # Install panfork
+        # Install panfork (only available for jammy/noble — not resolute yet)
         chroot "${rootfs}" add-apt-repository -y ppa:jjriek/panfork-mesa
         chroot "${rootfs}" apt-get update
         chroot "${rootfs}" apt-get -y install mali-g610-firmware
@@ -39,8 +39,20 @@ function config_image_hook__orangepi-5-max() {
         cp "${overlay}/usr/lib/systemd/system/ap6611s-bluetooth.service" "${rootfs}/usr/lib/systemd/system/ap6611s-bluetooth.service"
         chroot "${rootfs}" systemctl enable ap6611s-bluetooth
 
-        # Install wiring orangepi package 
+        # Install wiring orangepi package
         chroot "${rootfs}" apt-get -y install wiringpi-opi libwiringpi2-opi libwiringpi-opi-dev
+        echo "BOARD=orangepi5max" > "${rootfs}/etc/orangepi-release"
+    fi
+
+    if [ "${suite}" == "resolute" ]; then
+        # Kernel modules to blacklist
+        echo "blacklist bcmdhd" > "${rootfs}/etc/modprobe.d/bcmdhd.conf"
+        echo "blacklist dhd_static_buf" >> "${rootfs}/etc/modprobe.d/bcmdhd.conf"
+
+        # PPAs jjriek/panfork-mesa and rockchip packages don't have resolute
+        # releases yet — skip GPU/camera/wifi proprietary packages for now.
+        # TODO: re-enable when PPAs add resolute support.
+
         echo "BOARD=orangepi5max" > "${rootfs}/etc/orangepi-release"
     fi
 

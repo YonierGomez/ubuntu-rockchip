@@ -117,5 +117,25 @@ chroot "${CHROOT_DIR}" systemctl enable serial-getty@ttyFIQ0.service 2>/dev/null
 chroot "${CHROOT_DIR}" apt-get -y clean
 chroot "${CHROOT_DIR}" apt-get -y autoremove
 
+# Unmount pseudo-filesystems before tarring — sysfs/devtmpfs files are virtual
+# and change size while being read, causing tar to fail or produce corrupted entries.
+umount -lf "${CHROOT_DIR}/var/cache/apt"     2>/dev/null || true
+umount -lf "${CHROOT_DIR}/var/lib/apt/lists" 2>/dev/null || true
+umount -lf "${CHROOT_DIR}/tmp"               2>/dev/null || true
+umount -lf "${CHROOT_DIR}/sys/kernel/security" 2>/dev/null || true
+umount -lf "${CHROOT_DIR}/sys/fs/cgroup"     2>/dev/null || true
+umount -lf "${CHROOT_DIR}/sys"               2>/dev/null || true
+umount -lf "${CHROOT_DIR}/proc"              2>/dev/null || true
+umount -lf "${CHROOT_DIR}/dev/pts"           2>/dev/null || true
+umount -lf "${CHROOT_DIR}/dev"               2>/dev/null || true
+
 echo "Compressing rootfs to ${ROOTFS_TAR}..."
-(cd "${CHROOT_DIR}" && tar -cpf - --sort=name --xattrs ./*) | xz -3 -T0 > "${ROOTFS_TAR}"
+# Exclude virtual FS mount points — they're empty dirs in the rootfs and get
+# populated at boot by the kernel. Including them causes tar warnings.
+(cd "${CHROOT_DIR}" && tar -cpf - --sort=name --xattrs \
+    --exclude=./sys/* \
+    --exclude=./proc/* \
+    --exclude=./dev/* \
+    --exclude=./tmp/* \
+    --exclude=./run/* \
+    ./*) | xz -3 -T0 > "${ROOTFS_TAR}"
