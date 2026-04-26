@@ -42,6 +42,15 @@ RUN apt-get update && apt-get install -y \
     uuid-dev \
     libgnutls28-dev \
     u-boot-tools \
+    udev \
+    kpartx \
+    mount \
+    util-linux \
+    fdisk \
+    gdisk \
+    e2fsprogs \
+    dosfstools \
+    uuid-runtime \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 

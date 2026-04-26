@@ -95,6 +95,8 @@ if [ -z "${img##*server*}" ]; then
     } | fdisk "${disk}" &> /dev/null || true
 
     partprobe "${disk}"
+    # Force partition node creation — udev may not be running in the container
+    partx -u "${disk}" 2>/dev/null || partx -a "${disk}" 2>/dev/null || true
 
     partition_char="$(if [[ ${disk: -1} == [0-9] ]]; then echo p; fi)"
 
@@ -148,6 +150,8 @@ else
     } | fdisk "${disk}" &> /dev/null || true
 
     partprobe "${disk}"
+    # Force partition node creation — udev may not be running in the container
+    partx -u "${disk}" 2>/dev/null || partx -a "${disk}" 2>/dev/null || true
 
     partition_char="$(if [[ ${disk: -1} == [0-9] ]]; then echo p; fi)"
 
