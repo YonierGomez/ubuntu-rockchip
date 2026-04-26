@@ -171,7 +171,11 @@ cat > "${chroot_dir}/etc/default/u-boot" <<EOF
 
 U_BOOT_PROMPT="1"
 U_BOOT_TIMEOUT="20"
-U_BOOT_PARAMETERS="rootwait rw console=ttyS2,1500000 console=tty1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory"
+# earlycon + explicit UART2 base address (0xfeb50000 on RK3588) to get
+# kernel output before serial driver initializes. keep_bootcon prevents
+# console detach before framebuffer takes over. loglevel=8 + ignore_loglevel
+# are for debugging early panics — remove once boot is stable.
+U_BOOT_PARAMETERS="rootwait rw earlycon=uart8250,mmio32,0xfeb50000 console=ttyS2,1500000 console=tty1 keep_bootcon loglevel=8 ignore_loglevel cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory"
 U_BOOT_FDT_DIR="/lib/firmware/"
 U_BOOT_MENU_LABEL="Ubuntu ${RELASE_VERSION} LTS"
 EOF

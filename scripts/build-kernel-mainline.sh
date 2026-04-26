@@ -167,6 +167,32 @@ scripts/config --enable CONFIG_R8169
 scripts/config --enable CONFIG_MODULES
 scripts/config --enable CONFIG_MODULE_UNLOAD
 
+# Early boot debug — critical when diagnosing hardware without UART.
+# simplefb/simple-framebuffer lets kernel inherit HDMI framebuffer from
+# U-Boot so panic/oops is visible on screen instead of silent freeze.
+scripts/config --enable CONFIG_FB
+scripts/config --enable CONFIG_FB_SIMPLE
+scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE
+scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+scripts/config --enable CONFIG_LOGO
+
+# Early printk/earlycon support for UART2 on RK3588
+scripts/config --enable CONFIG_SERIAL_EARLYCON
+scripts/config --enable CONFIG_SERIAL_8250_EXTENDED
+scripts/config --enable CONFIG_SERIAL_8250_RUNTIME_UARTS
+scripts/config --enable CONFIG_SERIAL_AMBA_PL011
+scripts/config --enable CONFIG_SERIAL_AMBA_PL011_CONSOLE
+
+# ARM Trusted Firmware / SMCCC (required on RK3588 for power management)
+scripts/config --enable CONFIG_ARM_SMCCC_SOC_ID
+scripts/config --enable CONFIG_HAVE_ARM_SMCCC
+scripts/config --enable CONFIG_ARM_PSCI_FW
+
+# EFI framebuffer as alternative to simplefb
+scripts/config --enable CONFIG_EFI
+scripts/config --enable CONFIG_EFI_STUB
+scripts/config --enable CONFIG_SYSFB_SIMPLEFB
+
 # Regenerate config with dependencies
 make olddefconfig
 
