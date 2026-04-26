@@ -103,6 +103,7 @@ chroot "${CHROOT_DIR}" apt-get -y install \
     wget \
     mtd-utils \
     u-boot-tools \
+    u-boot-menu \
     device-tree-compiler
 
 if [ "${FLAVOR}" == "server" ]; then
