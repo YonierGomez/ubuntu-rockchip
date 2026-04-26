@@ -151,6 +151,34 @@ else
     chroot ${chroot_dir} apt-mark hold "$(echo "${linux_image_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
 fi
 
+# Mainline bindeb-pkg installs DTBs under /usr/lib/linux-image-VERSION/
+# but U-Boot with extlinux expects them under /boot/dtbs/. Copy them over
+# and patch extlinux.conf to reference the correct DTB for this board.
+kernel_version=$(echo "${linux_image_package}" | sed -rn 's/linux-image-(.*)_[[:digit:]].*/\1/p')
+dtb_src="${chroot_dir}/usr/lib/linux-image-${kernel_version}"
+dtb_dst="${chroot_dir}/boot/dtbs/${kernel_version}"
+if [ -d "${dtb_src}" ]; then
+    mkdir -p "${dtb_dst}"
+    cp -r "${dtb_src}"/* "${dtb_dst}/"
+fi
+
+# DTB path used by U-Boot (vendor/board.dtb). For RK3588 it lives in rockchip/
+board_dtb="rockchip/$(grep -oP 'UBOOT_RULES_TARGET="\K[^"]+' "../config/boards/${BOARD}.sh" 2>/dev/null | sed 's/-rk3588/-rk3588/').dtb"
+# Fall back to matching by board name if the grep failed
+if [ ! -f "${dtb_dst}/${board_dtb}" ]; then
+    board_dtb="rockchip/rk3588-${BOARD}.dtb"
+fi
+if [ ! -f "${dtb_dst}/${board_dtb}" ]; then
+    echo "Warning: DTB for ${BOARD} not found. Available DTBs:"
+    ls "${dtb_dst}/rockchip/" | grep -i "$(echo ${BOARD} | cut -d- -f1)" || true
+fi
+
+# Patch extlinux.conf to add the fdt line
+extlinux_conf="${chroot_dir}/boot/extlinux/extlinux.conf"
+if [ -f "${extlinux_conf}" ] && [ -f "${dtb_dst}/${board_dtb}" ]; then
+    sed -i "/initrd /a\\\tfdt /boot/dtbs/${kernel_version}/${board_dtb}" "${extlinux_conf}"
+fi
+
 # Update the initramfs
 chroot ${chroot_dir} update-initramfs -u
 
