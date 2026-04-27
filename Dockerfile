@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-dev \
     python3-setuptools \
+    python3-pyelftools \
+    python3-yaml \
     swig \
     libpython3-dev \
     device-tree-compiler \
