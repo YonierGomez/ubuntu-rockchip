@@ -222,9 +222,17 @@ if [[ ${LAUNCHPAD} != "Y" ]]; then
 fi
 
 # Build U-Boot if not found
+# Mainline kernel requires mainline U-Boot (Joshua Riek's BSP U-Boot is incompatible)
 if [[ ${LAUNCHPAD} != "Y" ]]; then
-    if [[ ! -e "$(find build/u-boot-"${BOARD}"_*.deb | sort | tail -n1)" ]]; then
-        ./scripts/build-u-boot.sh
+    if [[ "${KERNEL_BRANCH}" == v7* ]] || [[ "${KERNEL_REPO}" == *"torvalds/linux"* ]]; then
+        if [[ ! -e build/u-boot-mainline/u-boot-rockchip.bin ]]; then
+            echo "Using mainline U-Boot build script..."
+            ./scripts/build-u-boot-mainline.sh
+        fi
+    else
+        if [[ ! -e "$(find build/u-boot-"${BOARD}"_*.deb | sort | tail -n1)" ]]; then
+            ./scripts/build-u-boot.sh
+        fi
     fi
 fi
 

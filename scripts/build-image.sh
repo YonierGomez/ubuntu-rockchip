@@ -210,8 +210,13 @@ tar -xpf "${rootfs}" -C ${mount_point}/writable
 echo "# <file system>     <mount point>  <type>  <options>   <dump>  <fsck>" > ${mount_point}/writable/etc/fstab
 echo "UUID=${root_uuid,,} /              ext4    defaults,x-systemd.growfs    0       1" >> ${mount_point}/writable/etc/fstab
 
-# Write bootloader to disk image
-if [ -f "${mount_point}/writable/usr/lib/u-boot/u-boot-rockchip.bin" ]; then
+# Write bootloader to disk image.
+# Priority: mainline U-Boot (built separately) > deb-packaged u-boot-rockchip.bin > idbloader+u-boot.itb
+MAINLINE_UBOOT="../build/u-boot-mainline/u-boot-rockchip.bin"
+if [ -f "${MAINLINE_UBOOT}" ]; then
+    echo "Writing mainline U-Boot (u-boot-rockchip.bin) to disk"
+    dd if="${MAINLINE_UBOOT}" of="${loop}" seek=1 bs=32k conv=fsync
+elif [ -f "${mount_point}/writable/usr/lib/u-boot/u-boot-rockchip.bin" ]; then
     dd if="${mount_point}/writable/usr/lib/u-boot/u-boot-rockchip.bin" of="${loop}" seek=1 bs=32k conv=fsync
 else
     dd if="${mount_point}/writable/usr/lib/u-boot/idbloader.img" of="${loop}" seek=64 conv=notrunc

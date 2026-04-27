@@ -36,10 +36,17 @@ fi
 source "../config/flavors/${FLAVOR}.sh"
 
 if [[ ${LAUNCHPAD} != "Y" ]]; then
-    uboot_package="$(basename "$(find u-boot-"${BOARD}"_*.deb | sort | tail -n1)")"
-    if [ ! -e "$uboot_package" ]; then
-        echo 'Error: could not find the u-boot package'
-        exit 1
+    # Mainline U-Boot is built separately (no .deb), lives in build/u-boot-mainline/
+    # When using mainline kernel, skip the .deb lookup and mark uboot_package empty.
+    if [ -f u-boot-mainline/u-boot-rockchip.bin ]; then
+        uboot_package=""
+        echo "Using mainline U-Boot from build/u-boot-mainline/"
+    else
+        uboot_package="$(basename "$(find u-boot-"${BOARD}"_*.deb 2>/dev/null | sort | tail -n1)")"
+        if [ -z "${uboot_package}" ] || [ ! -e "$uboot_package" ]; then
+            echo 'Error: could not find the u-boot package'
+            exit 1
+        fi
     fi
 
     # Exclude debug packages (-dbg) so we install only the main image
@@ -132,13 +139,16 @@ fi
 # Download and install U-Boot
 if [[ ${LAUNCHPAD} == "Y" ]]; then
     chroot ${chroot_dir} apt-get -y install "u-boot-${BOARD}"
-else
+elif [ -n "${uboot_package}" ]; then
     cp "${uboot_package}" ${chroot_dir}/tmp/
     # dpkg -i may fail if dependencies aren't satisfied; resolve with apt-get -f
     chroot ${chroot_dir} dpkg -i "/tmp/${uboot_package}" || chroot ${chroot_dir} apt-get install -y -f
     chroot ${chroot_dir} apt-mark hold "$(echo "${uboot_package}" | sed -rn 's/(.*)_[[:digit:]].*/\1/p')"
+fi
+# Mainline U-Boot: binary written directly to disk in build-image.sh, no deb
 
-    # Build list of kernel debs that actually exist (mainline only has image+headers)
+# Install kernel packages (needed for both Joshua Riek and mainline kernels)
+if [[ ${LAUNCHPAD} != "Y" ]]; then
     kernel_debs=("${linux_image_package}" "${linux_headers_package}")
     for optional in "${linux_modules_package}" "${linux_buildinfo_package}" "${linux_rockchip_headers_package}"; do
         [ -n "$optional" ] && [ -e "$optional" ] && kernel_debs+=("$optional")
