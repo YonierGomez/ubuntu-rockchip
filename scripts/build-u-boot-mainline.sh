@@ -23,9 +23,7 @@ UBOOT_DEFCONFIG="orangepi-5-max-rk3588_defconfig"
 
 # Rockchip firmware blobs (DDR init + BL31 ARM Trusted Firmware)
 RKBIN_REPO="https://github.com/rockchip-linux/rkbin.git"
-# Match what Armbian uses for RK3588
-RKBIN_BL31="rk3588_bl31_v1.45.elf"
-RKBIN_DDR="rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.16.bin"
+# Blob versions are auto-detected from rkbin/bin/rk35/ (newest by sort -V)
 
 echo "=== Building mainline U-Boot ${UBOOT_TAG} for ${BOARD} ==="
 
@@ -41,24 +39,28 @@ fi
 
 cd u-boot-mainline
 
+# Auto-detect newest available blobs (Rockchip releases updated versions over time).
+RKBIN_DIR="${PWD}/../rkbin/bin/rk35"
+RKBIN_BL31_PATH=$(ls "${RKBIN_DIR}"/rk3588_bl31_v*.elf 2>/dev/null | sort -V | tail -n1)
+RKBIN_DDR_PATH=$(ls "${RKBIN_DIR}"/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v*.bin 2>/dev/null | grep -v eyescan | sort -V | tail -n1)
+
+if [ -z "${RKBIN_BL31_PATH}" ]; then
+    echo "Error: No rk3588_bl31_v*.elf found in ${RKBIN_DIR}"
+    ls "${RKBIN_DIR}" | head
+    exit 1
+fi
+if [ -z "${RKBIN_DDR_PATH}" ]; then
+    echo "Error: No rk3588_ddr_*.bin found in ${RKBIN_DIR}"
+    ls "${RKBIN_DIR}" | head
+    exit 1
+fi
+
 # shellcheck disable=SC2046
 export $(dpkg-architecture -aarm64)
 export CROSS_COMPILE=aarch64-linux-gnu-
 export ARCH=arm
-export BL31="${PWD}/../rkbin/bin/rk35/${RKBIN_BL31}"
-export ROCKCHIP_TPL="${PWD}/../rkbin/bin/rk35/${RKBIN_DDR}"
-
-# Verify blobs exist
-if [ ! -f "${BL31}" ]; then
-    echo "Error: BL31 not found at ${BL31}"
-    ls "${PWD}/../rkbin/bin/rk35/" 2>/dev/null | grep bl31 | head
-    exit 1
-fi
-if [ ! -f "${ROCKCHIP_TPL}" ]; then
-    echo "Error: DDR blob not found at ${ROCKCHIP_TPL}"
-    ls "${PWD}/../rkbin/bin/rk35/" 2>/dev/null | grep ddr | head
-    exit 1
-fi
+export BL31="${RKBIN_BL31_PATH}"
+export ROCKCHIP_TPL="${RKBIN_DDR_PATH}"
 
 echo "=== BL31:  ${BL31}"
 echo "=== TPL:   ${ROCKCHIP_TPL}"
